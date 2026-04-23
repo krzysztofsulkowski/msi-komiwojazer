@@ -10,7 +10,7 @@ Aplikacja została przygotowana jako **wersja desktopowa w Pythonie**.
 
 ## Grupa reazlizująca projekt
 - Dawid Nowak
-- Krzysztof Sułkowksi (lider projektu)
+- Krzysztof Sułkowski (lider projektu)
 - Anna Trybel
 - Aneta Walczak
 
