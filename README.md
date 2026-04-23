@@ -8,7 +8,7 @@ Celem aplikacji jest stworzenie prostego systemu wsparcia logistycznego, który 
 
 Aplikacja została przygotowana jako **wersja desktopowa w Pythonie**.
 
-## Grupa reazlizująca projekt
+## Grupa realizująca projekt
 - Dawid Nowak
 - Krzysztof Sułkowski (lider projektu)
 - Anna Trybel
