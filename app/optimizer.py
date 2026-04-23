@@ -6,7 +6,7 @@ def calculate_distance(point_a, point_b):
     return np.sqrt((point_a.x - point_b.x) ** 2 + (point_a.y - point_b.y) ** 2)
 
 
-def calculate_total_distance(points):
+def calculate_total_distance(points, return_to_start=True):
     if len(points) < 2:
         return 0
 
@@ -14,6 +14,9 @@ def calculate_total_distance(points):
 
     for i in range(len(points) - 1):
         total += calculate_distance(points[i], points[i + 1])
+
+    if return_to_start:
+        total += calculate_distance(points[-1], points[0])
 
     return total
 

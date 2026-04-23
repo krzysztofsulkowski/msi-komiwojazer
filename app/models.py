@@ -6,3 +6,4 @@ class Point:
     name: str
     x: float
     y: float
+    is_start: bool = False
