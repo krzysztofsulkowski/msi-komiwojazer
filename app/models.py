@@ -4,6 +4,6 @@ from dataclasses import dataclass
 @dataclass
 class Point:
     name: str
-    x: float
-    y: float
+    lat: float
+    lon: float
     is_start: bool = False
