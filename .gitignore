@@ -7,3 +7,45 @@ __pycache__/
 *.pyo
 *.pyd
 .DS_Store
+
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Środowisko wirtualne 
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Środowiska programistyczne 
+.idea/             # PyCharm
+.vscode/            # VS Code
+*.swp
+*.swo
+
+# pliki systemowe
+Thumbs.db
+desktop.ini
+
+*.html             # Mapy Folium (często generowane jako .html)
+results/           # Folder na eksportowane dane (jeśli go stworzysz)
+*.log     
