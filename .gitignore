@@ -37,8 +37,8 @@ env.bak/
 venv.bak/
 
 # Środowiska programistyczne 
-.idea/             # PyCharm
-.vscode/            # VS Code
+.idea/             
+.vscode/            
 *.swp
 *.swo
 
@@ -46,6 +46,6 @@ venv.bak/
 Thumbs.db
 desktop.ini
 
-*.html             # Mapy Folium (często generowane jako .html)
-results/           # Folder na eksportowane dane (jeśli go stworzysz)
+*.html            
+results/           
 *.log     
