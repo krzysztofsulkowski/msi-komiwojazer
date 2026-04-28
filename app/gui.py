@@ -5,6 +5,7 @@ from datetime import datetime
 from app.models import Point
 from app.optimizer import genetic_algorithm_route, calculate_total_distance
 from app.exporter import export_route_to_json
+from app.geocoder import search_address
 
 
 class RouteApp:
@@ -23,6 +24,9 @@ class RouteApp:
         self.improvement_label = None
         self.status_label = None
         self.details_label = None
+
+        self.address_results_list = None
+        self.address_search_results = []
 
         self.latitude_entry = None
         self.longitude_entry = None
@@ -217,6 +221,30 @@ class RouteApp:
         )
         fill_coordinates_button.pack(anchor="w", padx=20, pady=(0, 8))
 
+        search_address_button = tk.Button(
+            right_panel,
+            text="Szukaj adresu",
+            bg="#0891b2",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            relief="flat",
+            padx=12,
+            pady=8,
+            command=self.search_address_from_form
+        )
+        search_address_button.pack(anchor="w", padx=20, pady=(0, 8))
+
+        self.address_results_list = tk.Listbox(
+            right_panel,
+            font=("Arial", 9),
+            bd=0,
+            highlightthickness=1,
+            highlightbackground="#d1d5db",
+            height=4
+        )
+        self.address_results_list.pack(fill="x", padx=20, pady=(0, 8))
+        self.address_results_list.bind("<<ListboxSelect>>", self.select_address_result)
+
         add_button = tk.Button(
             right_panel,
             text="Dodaj punkt",
@@ -379,6 +407,55 @@ class RouteApp:
         y = margin_top + ((max_latitude - latitude) / (max_latitude - min_latitude)) * usable_height
 
         return x, y
+
+    def search_address_from_form(self):
+        address = self.address_entry.get().strip()
+
+        result = search_address(address)
+
+        self.address_results_list.delete(0, tk.END)
+        self.address_search_results = []
+
+        if not result["success"]:
+            self.status_label.config(text=f"Status: {result['message']}")
+            return
+
+        self.address_search_results = result["results"]
+
+        for item in self.address_search_results:
+            display_address = item["address"]
+
+            if len(display_address) > 70:
+                display_address = display_address[:67] + "..."
+
+            self.address_results_list.insert(tk.END, display_address)
+
+        self.status_label.config(text=f"Status: {result['message']}")
+
+    def select_address_result(self, event=None):
+        selected_index = self.address_results_list.curselection()
+
+        if not selected_index:
+            return
+
+        index = selected_index[0]
+
+        if index < 0 or index >= len(self.address_search_results):
+            self.status_label.config(text="Status: nieprawidłowy wynik adresu")
+            return
+
+        selected_result = self.address_search_results[index]
+
+        self.address_entry.delete(0, tk.END)
+        self.address_entry.insert(0, selected_result["address"])
+
+        self.latitude_entry.delete(0, tk.END)
+        self.latitude_entry.insert(0, str(selected_result["latitude"]))
+
+        self.longitude_entry.delete(0, tk.END)
+        self.longitude_entry.insert(0, str(selected_result["longitude"]))
+
+        self.status_label.config(text="Status: wybrano adres i uzupełniono współrzędne")
 
     def refresh_canvas_positions(self):
         for point in self.points:
