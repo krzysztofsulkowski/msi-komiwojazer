@@ -1,47 +1,68 @@
 {
-    "distance": 1371.9029898745218,
+    "distance": 2778.8037760232905,
     "route": [
         {
             "name": "Baza",
-            "x": 120,
-            "y": 100,
-            "is_start": true
-        },
-        {
-            "name": "Punkt 2",
-            "x": 160,
-            "y": 320,
-            "is_start": false
-        },
-        {
-            "name": "Punkt 6",
-            "x": 300,
-            "y": 420,
-            "is_start": false
+            "latitude": 51.1079,
+            "longitude": 17.0385,
+            "x": 425.3899999999999,
+            "y": 554.6242499999998,
+            "is_start": true,
+            "delivered": false
         },
         {
             "name": "Punkt 3",
-            "x": 420,
-            "y": 360,
-            "is_start": false
+            "latitude": 50.0647,
+            "longitude": 19.945,
+            "x": 832.3000000000001,
+            "y": 703.2802499999997,
+            "is_start": false,
+            "delivered": true
         },
         {
-            "name": "Punkt 4",
-            "x": 560,
-            "y": 220,
-            "is_start": false
+            "name": "Punkt 6",
+            "latitude": 51.2465,
+            "longitude": 22.5684,
+            "x": 1199.576,
+            "y": 534.8737500000003,
+            "is_start": false,
+            "delivered": true
         },
         {
-            "name": "Punkt 5",
-            "x": 620,
-            "y": 120,
-            "is_start": false
+            "name": "Punkt 2",
+            "latitude": 52.2297,
+            "longitude": 21.0122,
+            "x": 981.708,
+            "y": 394.76774999999986,
+            "is_start": false,
+            "delivered": false
         },
         {
             "name": "Punkt 1",
-            "x": 250,
-            "y": 180,
-            "is_start": false
+            "latitude": 51.7592,
+            "longitude": 19.456,
+            "x": 763.8399999999999,
+            "y": 461.814,
+            "is_start": false,
+            "delivered": true
+        },
+        {
+            "name": "Punkt 5",
+            "latitude": 54.352,
+            "longitude": 18.6466,
+            "x": 650.5239999999999,
+            "y": 92.34000000000046,
+            "is_start": false,
+            "delivered": true
+        },
+        {
+            "name": "Punkt 4",
+            "latitude": 53.4285,
+            "longitude": 14.5528,
+            "x": 77.39199999999992,
+            "y": 223.93875000000006,
+            "is_start": false,
+            "delivered": true
         }
     ]
 }

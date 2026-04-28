@@ -8,9 +8,14 @@ def export_route_to_json(points, file_path):
         "route": [
             {
                 "name": point.name,
+                "address": point.address,
+                "comment": point.comment,
+                "latitude": point.latitude,
+                "longitude": point.longitude,
                 "x": point.x,
                 "y": point.y,
-                "is_start": point.is_start
+                "is_start": point.is_start,
+                "delivered": point.delivered
             }
             for point in points
         ]
