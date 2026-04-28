@@ -1,13 +1,14 @@
 import tkinter as tk
 from app.models import Point
 from app.optimizer import genetic_algorithm_route, calculate_total_distance
+from app.exporter import export_route_to_json
 
 
 class RouteApp:
     def __init__(self, root):
         self.root = root
         self.root.title("MSI - Problem Komiwojażera")
-        self.root.geometry("1200x700")
+        self.root.geometry("1280x720")
         self.root.configure(bg="#f3f4f6")
 
         self.points = []
@@ -18,6 +19,9 @@ class RouteApp:
         self.distance_label = None
         self.improvement_label = None
         self.status_label = None
+
+        self.x_entry = None
+        self.y_entry = None
 
         self.build_layout()
 
@@ -61,6 +65,67 @@ class RouteApp:
         )
         points_title.pack(anchor="w", padx=20, pady=(20, 10))
 
+        sample_button = tk.Button(
+            right_panel,
+            text="Wczytaj przykładowe punkty",
+            bg="#6b7280",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            relief="flat",
+            padx=12,
+            pady=8,
+            command=self.load_sample_points
+        )
+        sample_button.pack(anchor="w", padx=20, pady=(0, 8))
+
+        clear_button = tk.Button(
+            right_panel,
+            text="Wyczyść trasę",
+            bg="#dc2626",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            relief="flat",
+            padx=12,
+            pady=8,
+            command=self.clear_route
+        )
+        clear_button.pack(anchor="w", padx=20, pady=(0, 20))
+
+        form_frame = tk.Frame(right_panel, bg="white")
+        form_frame.pack(fill="x", padx=20, pady=(0, 12))
+
+        x_label = tk.Label(
+            form_frame,
+            text="X:",
+            bg="white",
+            fg="#111827",
+            font=("Arial", 11)
+        )
+        x_label.grid(row=0, column=0, sticky="w", pady=(0, 6))
+
+        self.x_entry = tk.Entry(
+            form_frame,
+            font=("Arial", 11),
+            width=10
+        )
+        self.x_entry.grid(row=0, column=1, padx=(8, 0), pady=(0, 6))
+
+        y_label = tk.Label(
+            form_frame,
+            text="Y:",
+            bg="white",
+            fg="#111827",
+            font=("Arial", 11)
+        )
+        y_label.grid(row=1, column=0, sticky="w")
+
+        self.y_entry = tk.Entry(
+            form_frame,
+            font=("Arial", 11),
+            width=10
+        )
+        self.y_entry.grid(row=1, column=1, padx=(8, 0))
+
         add_button = tk.Button(
             right_panel,
             text="Dodaj punkt",
@@ -94,7 +159,20 @@ class RouteApp:
             pady=10,
             command=self.optimize_route
         )
-        optimize_button.pack(fill="x", padx=20, pady=(0, 20))
+        optimize_button.pack(fill="x", padx=20, pady=(0, 8))
+
+        export_button = tk.Button(
+            right_panel,
+            text="Eksportuj trasę do JSON",
+            bg="#2563eb",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            relief="flat",
+            padx=12,
+            pady=8,
+            command=self.export_route
+        )
+        export_button.pack(fill="x", padx=20, pady=(0, 20))
 
         self.distance_label = tk.Label(
             right_panel,
@@ -151,22 +229,23 @@ class RouteApp:
         legend_return.pack(anchor="w", padx=20, pady=(0, 10))
 
     def add_point(self):
-        predefined_positions = [
-            (120, 100),
-            (250, 180),
-            (160, 320),
-            (420, 360),
-            (560, 220),
-            (620, 120),
-            (300, 420),
-            (500, 100)
-        ]
+        try:
+            x = float(self.x_entry.get())
+            y = float(self.y_entry.get())
+        except ValueError:
+            self.status_label.config(text="Status: wpisz poprawne wartości X i Y")
+            return
 
-        if self.point_counter < len(predefined_positions):
-            x, y = predefined_positions[self.point_counter]
-        else:
-            x = 100 + (self.point_counter * 30) % 600
-            y = 100 + (self.point_counter * 40) % 400
+        if x < 0 or y < 0:
+            self.status_label.config(text="Status: X i Y muszą być większe lub równe 0")
+            return
+
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+
+        if x > canvas_width or y > canvas_height:
+            self.status_label.config(text="Status: punkt poza obszarem planszy")
+            return
 
         if self.point_counter == 0:
             point = Point(
@@ -186,11 +265,67 @@ class RouteApp:
         self.points.append(point)
         self.point_counter += 1
 
+        self.x_entry.delete(0, tk.END)
+        self.y_entry.delete(0, tk.END)
+
         self.refresh_points_list()
         self.draw_points()
         self.update_distance_label()
         self.improvement_label.config(text="Poprawa: 0.00")
         self.status_label.config(text="Status: dodano punkt")
+
+    def load_sample_points(self):
+        self.points = []
+        self.point_counter = 0
+
+        sample_positions = [
+            (120, 100),
+            (250, 180),
+            (160, 320),
+            (420, 360),
+            (560, 220),
+            (620, 120),
+            (300, 420)
+        ]
+
+        for x, y in sample_positions:
+            if self.point_counter == 0:
+                point = Point(
+                    name="Baza",
+                    x=x,
+                    y=y,
+                    is_start=True
+                )
+            else:
+                point = Point(
+                    name=f"Punkt {self.point_counter}",
+                    x=x,
+                    y=y,
+                    is_start=False
+                )
+
+            self.points.append(point)
+            self.point_counter += 1
+
+        self.refresh_points_list()
+        self.draw_points()
+        self.update_distance_label()
+        self.improvement_label.config(text="Poprawa: 0.00")
+        self.status_label.config(text="Status: wczytano przykładowe punkty")
+
+    def clear_route(self):
+        self.points = []
+        self.point_counter = 0
+
+        self.points_list.delete(0, tk.END)
+        self.canvas.delete("all")
+
+        self.x_entry.delete(0, tk.END)
+        self.y_entry.delete(0, tk.END)
+
+        self.distance_label.config(text="Dystans trasy: 0.00")
+        self.improvement_label.config(text="Poprawa: 0.00")
+        self.status_label.config(text="Status: wyczyszczono trasę")
 
     def refresh_points_list(self):
         self.points_list.delete(0, tk.END)
@@ -277,6 +412,14 @@ class RouteApp:
         improvement = before_distance - best_distance
         self.improvement_label.config(text=f"Poprawa: {improvement:.2f}")
         self.status_label.config(text="Status: trasa zoptymalizowana")
+
+    def export_route(self):
+        if len(self.points) < 2:
+            self.status_label.config(text="Status: za mało punktów do eksportu")
+            return
+
+        export_route_to_json(self.points, "route_result.json")
+        self.status_label.config(text="Status: wyeksportowano trasę do JSON")
 
 
 def run_app():

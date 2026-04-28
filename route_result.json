@@ -1,0 +1,47 @@
+{
+    "distance": 1371.9029898745218,
+    "route": [
+        {
+            "name": "Baza",
+            "x": 120,
+            "y": 100,
+            "is_start": true
+        },
+        {
+            "name": "Punkt 2",
+            "x": 160,
+            "y": 320,
+            "is_start": false
+        },
+        {
+            "name": "Punkt 6",
+            "x": 300,
+            "y": 420,
+            "is_start": false
+        },
+        {
+            "name": "Punkt 3",
+            "x": 420,
+            "y": 360,
+            "is_start": false
+        },
+        {
+            "name": "Punkt 4",
+            "x": 560,
+            "y": 220,
+            "is_start": false
+        },
+        {
+            "name": "Punkt 5",
+            "x": 620,
+            "y": 120,
+            "is_start": false
+        },
+        {
+            "name": "Punkt 1",
+            "x": 250,
+            "y": 180,
+            "is_start": false
+        }
+    ]
+}
