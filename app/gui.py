@@ -1,6 +1,7 @@
 import tkinter as tk
 import random
 import time
+from datetime import datetime
 from app.models import Point
 from app.optimizer import genetic_algorithm_route, calculate_total_distance
 from app.exporter import export_route_to_json
@@ -56,6 +57,7 @@ class RouteApp:
             highlightthickness=0
         )
         self.canvas.pack(fill="both", expand=True, padx=20, pady=20)
+        self.canvas.bind("<Configure>", self.on_canvas_resize)
 
         right_container = tk.Frame(content, bg="white", width=350, height=560)
         right_container.pack(side="right", fill="y", padx=(20, 0))
@@ -202,6 +204,19 @@ class RouteApp:
         )
         self.longitude_entry.grid(row=3, column=1, padx=(8, 0))
 
+        fill_coordinates_button = tk.Button(
+            right_panel,
+            text="Uzupełnij współrzędne",
+            bg="#0891b2",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            relief="flat",
+            padx=12,
+            pady=8,
+            command=self.fill_coordinates_from_address
+        )
+        fill_coordinates_button.pack(anchor="w", padx=20, pady=(0, 8))
+
         add_button = tk.Button(
             right_panel,
             text="Dodaj punkt",
@@ -303,6 +318,19 @@ class RouteApp:
         )
         performance_button.pack(fill="x", padx=20, pady=(0, 20))
 
+        report_button = tk.Button(
+            right_panel,
+            text="Raport wydajności",
+            bg="#7c2d12",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            relief="flat",
+            padx=12,
+            pady=8,
+            command=self.generate_performance_report
+        )
+        report_button.pack(fill="x", padx=20, pady=(0, 20))
+
         self.distance_label = tk.Label(
             right_panel,
             text="Dystans trasy: 0.00",
@@ -330,51 +358,70 @@ class RouteApp:
         )
         self.status_label.pack(anchor="w", padx=20, pady=(0, 20))
 
-        legend_title = tk.Label(
-            right_panel,
-            text="Legenda",
-            bg="white",
-            fg="#111827",
-            font=("Arial", 12, "bold")
-        )
-        legend_title.pack(anchor="w", padx=20, pady=(10, 6))
-
-        legend_route = tk.Label(
-            right_panel,
-            text="— pełna linia: przejazd między punktami",
-            bg="white",
-            fg="#2563eb",
-            font=("Arial", 10)
-        )
-        legend_route.pack(anchor="w", padx=20)
-
-        legend_return = tk.Label(
-            right_panel,
-            text="— przerywana linia: powrót do bazy",
-            bg="white",
-            fg="#60a5fa",
-            font=("Arial", 10)
-        )
-        legend_return.pack(anchor="w", padx=20, pady=(0, 10))
-
     def convert_gps_to_canvas_position(self, latitude, longitude):
         min_latitude = 51.18
         max_latitude = 51.23
         min_longitude = 16.11
         max_longitude = 16.21
 
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
+        canvas_width = max(self.canvas.winfo_width(), 1000)
+        canvas_height = max(self.canvas.winfo_height(), 600)
 
-        margin = 60
+        margin_left = 140
+        margin_right = 220
+        margin_top = 120
+        margin_bottom = 180
 
-        usable_width = canvas_width - 2 * margin
-        usable_height = canvas_height - 2 * margin
+        usable_width = canvas_width - margin_left - margin_right
+        usable_height = canvas_height - margin_top - margin_bottom
 
-        x = margin + ((longitude - min_longitude) / (max_longitude - min_longitude)) * usable_width
-        y = margin + ((max_latitude - latitude) / (max_latitude - min_latitude)) * usable_height
+        x = margin_left + ((longitude - min_longitude) / (max_longitude - min_longitude)) * usable_width
+        y = margin_top + ((max_latitude - latitude) / (max_latitude - min_latitude)) * usable_height
 
         return x, y
+
+    def refresh_canvas_positions(self):
+        for point in self.points:
+            point.x, point.y = self.convert_gps_to_canvas_position(
+                point.latitude,
+                point.longitude
+            )
+
+        self.draw_points()
+
+    def on_canvas_resize(self, event=None):
+        if self.points:
+            self.refresh_canvas_positions()
+        else:
+            self.canvas.delete("all")
+            self.draw_map_legend()
+
+    def fill_coordinates_from_address(self):
+        address = self.address_entry.get().strip().lower()
+
+        address_database = {
+            "magazyn legnica, ul. nowodworska 30": (51.1876, 16.1752),
+            "legnica, rynek 24": (51.2074, 16.1619),
+            "legnica, ul. złotoryjska 65": (51.2054, 16.1489),
+            "legnica, ul. wrocławska 88": (51.2087, 16.1815),
+            "legnica, ul. gwiezdna 4": (51.2172, 16.1847),
+            "legnica, ul. jaworzyńska 43": (51.1989, 16.1554),
+            "legnica, ul. chojnowska 76": (51.2131, 16.1342)
+        }
+
+        if address not in address_database:
+            self.status_label.config(text="Status: nie znaleziono adresu w bazie")
+            return
+
+        latitude, longitude = address_database[address]
+
+        self.latitude_entry.delete(0, tk.END)
+        self.longitude_entry.delete(0, tk.END)
+
+        self.latitude_entry.insert(0, str(latitude))
+        self.longitude_entry.insert(0, str(longitude))
+
+        self.status_label.config(text="Status: uzupełniono współrzędne")
 
     def add_point(self):
         try:
@@ -681,6 +728,122 @@ class RouteApp:
             if not point.is_start:
                 delivery_number += 1
 
+        self.draw_map_legend()
+
+    def draw_map_legend(self):
+        legend_x = 20
+        legend_y = max(self.canvas.winfo_height(), 600) - 185
+        legend_width = 285
+        legend_height = 160
+
+        self.canvas.create_rectangle(
+            legend_x,
+            legend_y,
+            legend_x + legend_width,
+            legend_y + legend_height,
+            fill="white",
+            outline="#d1d5db"
+        )
+
+        self.canvas.create_text(
+            legend_x + 12,
+            legend_y + 12,
+            text="Legenda mapy",
+            anchor="nw",
+            fill="#111827",
+            font=("Arial", 11, "bold")
+        )
+
+        items = [
+            ("#16a34a", "S", "magazyn / punkt startowy"),
+            ("#f59e0b", "1", "punkt do odwiedzenia"),
+            ("#9ca3af", "1", "punkt dostarczony"),
+        ]
+
+        y_offset = 42
+
+        for color, label, description in items:
+            circle_x = legend_x + 22
+            circle_y = legend_y + y_offset
+
+            self.canvas.create_oval(
+                circle_x - 10,
+                circle_y - 10,
+                circle_x + 10,
+                circle_y + 10,
+                fill=color,
+                outline=""
+            )
+
+            self.canvas.create_text(
+                circle_x,
+                circle_y,
+                text=label,
+                fill="white",
+                font=("Arial", 8, "bold")
+            )
+
+            if color == "#9ca3af":
+                self.canvas.create_text(
+                    circle_x + 9,
+                    circle_y - 9,
+                    text="✓",
+                    fill="#16a34a",
+                    font=("Arial", 9, "bold")
+                )
+
+            self.canvas.create_text(
+                legend_x + 45,
+                circle_y,
+                text=description,
+                anchor="w",
+                fill="#374151",
+                font=("Arial", 9)
+            )
+
+            y_offset += 28
+
+        line_y = legend_y + 127
+
+        self.canvas.create_line(
+            legend_x + 14,
+            line_y,
+            legend_x + 44,
+            line_y,
+            fill="#2563eb",
+            width=3
+        )
+
+        self.canvas.create_text(
+            legend_x + 55,
+            line_y,
+            text="linia pełna: trasa przejazdu",
+            anchor="w",
+            fill="#374151",
+            font=("Arial", 9)
+        )
+
+        return_line_y = legend_y + 147
+
+        self.canvas.create_line(
+            legend_x + 14,
+            return_line_y,
+            legend_x + 44,
+            return_line_y,
+            fill="#93c5fd",
+            width=2,
+            dash=(6, 4)
+        )
+
+        self.canvas.create_text(
+            legend_x + 55,
+            return_line_y,
+            text="linia przerywana: powrót do bazy",
+            anchor="w",
+            fill="#374151",
+            font=("Arial", 9)
+        )
+
     def update_distance_label(self):
         distance = calculate_total_distance(self.points)
         self.distance_label.config(text=f"Dystans trasy: {distance:.2f}")
@@ -772,6 +935,83 @@ class RouteApp:
         self.status_label.config(
             text=f"Status: 100 punktów zoptymalizowano w {elapsed_time:.2f} s"
         )
+
+    def generate_performance_report(self):
+        results = []
+
+        test_cases = [
+            (10, 60, 80, 60),
+            (100, 35, 40, 10)
+        ]
+
+        for points_count, population_size, generations, max_time in test_cases:
+            test_points = []
+
+            start_latitude = 51.2070
+            start_longitude = 16.1553
+            start_x, start_y = self.convert_gps_to_canvas_position(start_latitude, start_longitude)
+
+            start_point = Point(
+                name="Baza",
+                latitude=start_latitude,
+                longitude=start_longitude,
+                x=start_x,
+                y=start_y,
+                address="Magazyn Legnica, ul. Nowodworska 30",
+                comment="Punkt startowy testu wydajności",
+                is_start=True
+            )
+
+            test_points.append(start_point)
+
+            for i in range(1, points_count + 1):
+                latitude = random.uniform(51.18, 51.23)
+                longitude = random.uniform(16.11, 16.21)
+                x, y = self.convert_gps_to_canvas_position(latitude, longitude)
+
+                point = Point(
+                    name=f"Punkt {i}",
+                    latitude=latitude,
+                    longitude=longitude,
+                    x=x,
+                    y=y,
+                    address=f"Testowy punkt {i}",
+                    comment="",
+                    is_start=False
+                )
+
+                test_points.append(point)
+
+            start_time = time.perf_counter()
+            best_route, best_distance = genetic_algorithm_route(
+                test_points,
+                population_size=population_size,
+                generations=generations,
+                mutation_rate=0.08
+            )
+            end_time = time.perf_counter()
+
+            elapsed_time = end_time - start_time
+            status = "SPEŁNIONO" if elapsed_time <= max_time else "NIE SPEŁNIONO"
+
+            results.append(
+                f"{points_count} punktów:\n"
+                f"czas: {elapsed_time:.2f} s\n"
+                f"dystans: {best_distance:.2f}\n"
+                f"limit: {max_time} s\n"
+                f"status: {status}\n"
+            )
+
+        report_content = (
+                "RAPORT WYDAJNOŚCI\n"
+                f"Data wygenerowania: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                + "\n".join(results)
+        )
+
+        with open("performance_report.txt", "w", encoding="utf-8") as file:
+            file.write(report_content)
+
+        self.status_label.config(text="Status: wygenerowano raport wydajności")
 
 
 def run_app():
