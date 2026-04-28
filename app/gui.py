@@ -115,6 +115,8 @@ class RouteApp:
         )
         points_title.pack(anchor="w", padx=20, pady=(20, 10))
 
+        self.create_section_title(right_panel, "Dane testowe")
+
         sample_button = tk.Button(
             right_panel,
             text="Wczytaj przykładowe punkty",
@@ -140,6 +142,8 @@ class RouteApp:
             command=self.clear_route
         )
         clear_button.pack(anchor="w", padx=20, pady=(0, 20))
+
+        self.create_section_title(right_panel, "Dodawanie punktu")
 
         form_frame = tk.Frame(right_panel, bg="white")
         form_frame.pack(fill="x", padx=20, pady=(0, 12))
@@ -208,19 +212,6 @@ class RouteApp:
         )
         self.longitude_entry.grid(row=3, column=1, padx=(8, 0))
 
-        fill_coordinates_button = tk.Button(
-            right_panel,
-            text="Uzupełnij współrzędne",
-            bg="#0891b2",
-            fg="white",
-            font=("Arial", 11, "bold"),
-            relief="flat",
-            padx=12,
-            pady=8,
-            command=self.fill_coordinates_from_address
-        )
-        fill_coordinates_button.pack(anchor="w", padx=20, pady=(0, 8))
-
         search_address_button = tk.Button(
             right_panel,
             text="Szukaj adresu",
@@ -257,6 +248,8 @@ class RouteApp:
             command=self.add_point
         )
         add_button.pack(anchor="w", padx=20, pady=(0, 8))
+
+        self.create_section_title(right_panel, "Zarządzanie punktem")
 
         comment_button = tk.Button(
             right_panel,
@@ -306,6 +299,8 @@ class RouteApp:
             command=self.mark_selected_as_delivered
         )
         delivered_button.pack(fill="x", padx=20, pady=(0, 8))
+
+        self.create_section_title(right_panel, "Operacje na trasie")
 
         optimize_button = tk.Button(
             right_panel,
@@ -385,6 +380,16 @@ class RouteApp:
             font=("Arial", 11)
         )
         self.status_label.pack(anchor="w", padx=20, pady=(0, 20))
+
+    def create_section_title(self, parent, text):
+        label = tk.Label(
+            parent,
+            text=text,
+            bg="white",
+            fg="#111827",
+            font=("Arial", 11, "bold")
+        )
+        label.pack(anchor="w", padx=20, pady=(16, 8))
 
     def convert_gps_to_canvas_position(self, latitude, longitude):
         min_latitude = 51.18
@@ -472,33 +477,6 @@ class RouteApp:
         else:
             self.canvas.delete("all")
             self.draw_map_legend()
-
-    def fill_coordinates_from_address(self):
-        address = self.address_entry.get().strip().lower()
-
-        address_database = {
-            "magazyn legnica, ul. nowodworska 30": (51.1876, 16.1752),
-            "legnica, rynek 24": (51.2074, 16.1619),
-            "legnica, ul. złotoryjska 65": (51.2054, 16.1489),
-            "legnica, ul. wrocławska 88": (51.2087, 16.1815),
-            "legnica, ul. gwiezdna 4": (51.2172, 16.1847),
-            "legnica, ul. jaworzyńska 43": (51.1989, 16.1554),
-            "legnica, ul. chojnowska 76": (51.2131, 16.1342)
-        }
-
-        if address not in address_database:
-            self.status_label.config(text="Status: nie znaleziono adresu w bazie")
-            return
-
-        latitude, longitude = address_database[address]
-
-        self.latitude_entry.delete(0, tk.END)
-        self.longitude_entry.delete(0, tk.END)
-
-        self.latitude_entry.insert(0, str(latitude))
-        self.longitude_entry.insert(0, str(longitude))
-
-        self.status_label.config(text="Status: uzupełniono współrzędne")
 
     def add_point(self):
         try:
