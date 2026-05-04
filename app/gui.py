@@ -1,4 +1,5 @@
 import tkinter as tk
+import tkintermapview
 import random
 import time
 from datetime import datetime
@@ -6,6 +7,7 @@ from app.models import Point
 from app.optimizer import genetic_algorithm_route, calculate_total_distance
 from app.exporter import export_route_to_json
 from app.geocoder import search_address
+from app.route_service import get_road_route_between_points
 
 
 class RouteApp:
@@ -24,6 +26,12 @@ class RouteApp:
         self.improvement_label = None
         self.status_label = None
         self.details_label = None
+
+        self.map_widget = None
+        self.map_markers = []
+        self.map_path = None
+        self.route_optimized = False
+        self.performance_mode = False
 
         self.address_results_list = None
         self.address_search_results = []
@@ -55,13 +63,16 @@ class RouteApp:
         left_panel.pack(side="left", fill="both", expand=True)
         left_panel.pack_propagate(False)
 
-        self.canvas = tk.Canvas(
+        self.map_widget = tkintermapview.TkinterMapView(
             left_panel,
-            bg="#eef2f7",
-            highlightthickness=0
+            corner_radius=0
         )
-        self.canvas.pack(fill="both", expand=True, padx=20, pady=20)
-        self.canvas.bind("<Configure>", self.on_canvas_resize)
+        self.map_widget.pack(fill="both", expand=True, padx=20, pady=20)
+
+        self.map_widget.set_position(51.2070, 16.1553)
+        self.map_widget.set_zoom(13)
+
+        self.create_map_legend(left_panel)
 
         right_container = tk.Frame(content, bg="white", width=350, height=560)
         right_container.pack(side="right", fill="y", padx=(20, 0))
@@ -397,19 +408,11 @@ class RouteApp:
         min_longitude = 16.11
         max_longitude = 16.21
 
-        canvas_width = max(self.canvas.winfo_width(), 1000)
-        canvas_height = max(self.canvas.winfo_height(), 600)
+        virtual_width = 1000
+        virtual_height = 600
 
-        margin_left = 140
-        margin_right = 220
-        margin_top = 120
-        margin_bottom = 180
-
-        usable_width = canvas_width - margin_left - margin_right
-        usable_height = canvas_height - margin_top - margin_bottom
-
-        x = margin_left + ((longitude - min_longitude) / (max_longitude - min_longitude)) * usable_width
-        y = margin_top + ((max_latitude - latitude) / (max_latitude - min_latitude)) * usable_height
+        x = ((longitude - min_longitude) / (max_longitude - min_longitude)) * virtual_width
+        y = ((max_latitude - latitude) / (max_latitude - min_latitude)) * virtual_height
 
         return x, y
 
@@ -462,22 +465,6 @@ class RouteApp:
 
         self.status_label.config(text="Status: wybrano adres i uzupełniono współrzędne")
 
-    def refresh_canvas_positions(self):
-        for point in self.points:
-            point.x, point.y = self.convert_gps_to_canvas_position(
-                point.latitude,
-                point.longitude
-            )
-
-        self.draw_points()
-
-    def on_canvas_resize(self, event=None):
-        if self.points:
-            self.refresh_canvas_positions()
-        else:
-            self.canvas.delete("all")
-            self.draw_map_legend()
-
     def add_point(self):
         try:
             latitude = float(self.latitude_entry.get())
@@ -529,6 +516,8 @@ class RouteApp:
         self.latitude_entry.delete(0, tk.END)
         self.longitude_entry.delete(0, tk.END)
 
+        self.route_optimized = False
+        self.performance_mode = False
         self.refresh_points_list()
         self.draw_points()
         self.update_distance_label()
@@ -578,6 +567,8 @@ class RouteApp:
             self.points.append(point)
             self.point_counter += 1
 
+        self.route_optimized = False
+        self.performance_mode = False
         self.refresh_points_list()
         self.draw_points()
         self.update_distance_label()
@@ -587,9 +578,18 @@ class RouteApp:
     def clear_route(self):
         self.points = []
         self.point_counter = 0
+        self.route_optimized = False
+        self.performance_mode = False
 
         self.points_list.delete(0, tk.END)
-        self.canvas.delete("all")
+        for marker in self.map_markers:
+            marker.delete()
+
+        self.map_markers = []
+
+        if self.map_path:
+            self.map_path.delete()
+            self.map_path = None
 
         self.address_entry.delete(0, tk.END)
         self.comment_entry.delete(0, tk.END)
@@ -714,196 +714,127 @@ class RouteApp:
         self.status_label.config(text="Status: zapisano komentarz do punktu")
 
     def draw_points(self):
-        self.canvas.delete("all")
+        for marker in self.map_markers:
+            marker.delete()
 
-        for i in range(len(self.points) - 1):
-            p1 = self.points[i]
-            p2 = self.points[i + 1]
+        self.map_markers = []
 
-            self.canvas.create_line(
-                p1.x, p1.y,
-                p2.x, p2.y,
-                fill="#2563eb",
+        if self.map_path:
+            self.map_path.delete()
+            self.map_path = None
+
+        if not self.points:
+            return
+
+        if len(self.points) > 1 and not self.route_optimized:
+            straight_route = [
+                (point.latitude, point.longitude)
+                for point in self.points
+            ]
+
+            straight_route.append(
+                (self.points[0].latitude, self.points[0].longitude)
+            )
+
+            self.map_path = self.map_widget.set_path(
+                straight_route,
+                color="#2563eb",
                 width=3
             )
 
-        if len(self.points) > 1:
-            last_point = self.points[-1]
-            start_point = self.points[0]
+        elif len(self.points) > 1 and self.route_optimized and not self.performance_mode:
+            road_route_coordinates = []
+            total_road_distance = 0
 
-            self.canvas.create_line(
-                last_point.x, last_point.y,
-                start_point.x, start_point.y,
-                fill="#93c5fd",
-                width=2,
-                dash=(6, 4)
+            full_route = self.points + [self.points[0]]
+
+            for i in range(len(full_route) - 1):
+                distance_km, route_coordinates = get_road_route_between_points(
+                    full_route[i],
+                    full_route[i + 1]
+                )
+
+                if route_coordinates:
+                    if road_route_coordinates:
+                        road_route_coordinates.extend(route_coordinates[1:])
+                    else:
+                        road_route_coordinates.extend(route_coordinates)
+
+                    total_road_distance += distance_km
+                else:
+                    fallback_coordinates = [
+                        (full_route[i].latitude, full_route[i].longitude),
+                        (full_route[i + 1].latitude, full_route[i + 1].longitude)
+                    ]
+
+                    if road_route_coordinates:
+                        road_route_coordinates.extend(fallback_coordinates[1:])
+                    else:
+                        road_route_coordinates.extend(fallback_coordinates)
+
+            self.map_path = self.map_widget.set_path(
+                road_route_coordinates,
+                color="#dc2626",
+                width=4
             )
+
+            self.distance_label.config(text=f"Dystans trasy: {total_road_distance:.2f} km")
 
         delivery_number = 1
 
         for point in self.points:
-            radius = 18
-
             if point.is_start:
-                fill_color = "#16a34a"
-                label = "S"
-            elif point.delivered:
-                fill_color = "#9ca3af"
-                label = str(delivery_number)
+                marker_text = "S"
+                marker_color = "#16a34a"
             else:
-                fill_color = "#f59e0b"
-                label = str(delivery_number)
+                marker_text = f"{delivery_number}"
+                marker_color = "#9ca3af" if point.delivered else "#f59e0b"
 
-            self.canvas.create_oval(
-                point.x - radius,
-                point.y - radius,
-                point.x + radius,
-                point.y + radius,
-                fill=fill_color,
-                outline=""
-            )
+                if point.delivered:
+                    marker_text = f"{delivery_number} ✓"
 
-            self.canvas.create_text(
-                point.x,
-                point.y,
-                text=label,
-                fill="white",
-                font=("Arial", 11, "bold")
-            )
-
-            if point.delivered and not point.is_start:
-                self.canvas.create_text(
-                    point.x + 14,
-                    point.y - 14,
-                    text="✓",
-                    fill="#16a34a",
-                    font=("Arial", 12, "bold")
-                )
-
-            if not point.is_start:
                 delivery_number += 1
 
-        self.draw_map_legend()
-
-    def draw_map_legend(self):
-        legend_x = 20
-        legend_y = max(self.canvas.winfo_height(), 600) - 185
-        legend_width = 285
-        legend_height = 160
-
-        self.canvas.create_rectangle(
-            legend_x,
-            legend_y,
-            legend_x + legend_width,
-            legend_y + legend_height,
-            fill="white",
-            outline="#d1d5db"
-        )
-
-        self.canvas.create_text(
-            legend_x + 12,
-            legend_y + 12,
-            text="Legenda mapy",
-            anchor="nw",
-            fill="#111827",
-            font=("Arial", 11, "bold")
-        )
-
-        items = [
-            ("#16a34a", "S", "magazyn / punkt startowy"),
-            ("#f59e0b", "1", "punkt do odwiedzenia"),
-            ("#9ca3af", "1", "punkt dostarczony"),
-        ]
-
-        y_offset = 42
-
-        for color, label, description in items:
-            circle_x = legend_x + 22
-            circle_y = legend_y + y_offset
-
-            self.canvas.create_oval(
-                circle_x - 10,
-                circle_y - 10,
-                circle_x + 10,
-                circle_y + 10,
-                fill=color,
-                outline=""
+            marker = self.map_widget.set_marker(
+                point.latitude,
+                point.longitude,
+                text=marker_text,
+                marker_color_circle=marker_color,
+                marker_color_outside=marker_color
             )
 
-            self.canvas.create_text(
-                circle_x,
-                circle_y,
-                text=label,
-                fill="white",
-                font=("Arial", 8, "bold")
-            )
+            self.map_markers.append(marker)
 
-            if color == "#9ca3af":
-                self.canvas.create_text(
-                    circle_x + 9,
-                    circle_y - 9,
-                    text="✓",
-                    fill="#16a34a",
-                    font=("Arial", 9, "bold")
+        if self.points and len(self.points) <= 30:
+            min_latitude = min(point.latitude for point in self.points)
+            max_latitude = max(point.latitude for point in self.points)
+            min_longitude = min(point.longitude for point in self.points)
+            max_longitude = max(point.longitude for point in self.points)
+
+            if min_latitude != max_latitude and min_longitude != max_longitude:
+                self.map_widget.fit_bounding_box(
+                    (max_latitude, min_longitude),
+                    (min_latitude, max_longitude)
                 )
-
-            self.canvas.create_text(
-                legend_x + 45,
-                circle_y,
-                text=description,
-                anchor="w",
-                fill="#374151",
-                font=("Arial", 9)
+            else:
+                self.map_widget.set_position(
+                    self.points[0].latitude,
+                    self.points[0].longitude
+                )
+        elif self.points:
+            self.map_widget.set_position(
+                self.points[0].latitude,
+                self.points[0].longitude
             )
-
-            y_offset += 28
-
-        line_y = legend_y + 127
-
-        self.canvas.create_line(
-            legend_x + 14,
-            line_y,
-            legend_x + 44,
-            line_y,
-            fill="#2563eb",
-            width=3
-        )
-
-        self.canvas.create_text(
-            legend_x + 55,
-            line_y,
-            text="linia pełna: trasa przejazdu",
-            anchor="w",
-            fill="#374151",
-            font=("Arial", 9)
-        )
-
-        return_line_y = legend_y + 147
-
-        self.canvas.create_line(
-            legend_x + 14,
-            return_line_y,
-            legend_x + 44,
-            return_line_y,
-            fill="#93c5fd",
-            width=2,
-            dash=(6, 4)
-        )
-
-        self.canvas.create_text(
-            legend_x + 55,
-            return_line_y,
-            text="linia przerywana: powrót do bazy",
-            anchor="w",
-            fill="#374151",
-            font=("Arial", 9)
-        )
 
     def update_distance_label(self):
         distance = calculate_total_distance(self.points)
         self.distance_label.config(text=f"Dystans trasy: {distance:.2f}")
 
     def optimize_route(self):
+        self.performance_mode = False
+        self.status_label.config(text="Status: optymalizuję trasę...")
+        self.root.update()
         if len(self.points) < 2:
             self.status_label.config(text="Status: za mało punktów do optymalizacji")
             return
@@ -912,13 +843,16 @@ class RouteApp:
         best_route, best_distance = genetic_algorithm_route(self.points)
 
         self.points = best_route
+        self.route_optimized = True
         self.refresh_points_list()
         self.draw_points()
         self.update_distance_label()
 
         improvement = before_distance - best_distance
         self.improvement_label.config(text=f"Poprawa: {improvement:.2f}")
-        self.status_label.config(text="Status: trasa zoptymalizowana")
+        self.status_label.config(
+            text=f"Status: zoptymalizowano trasę (poprawa {improvement:.2f})"
+        )
 
     def export_route(self):
         if len(self.points) < 2:
@@ -931,6 +865,7 @@ class RouteApp:
     def run_performance_test(self):
         self.points = []
         self.point_counter = 0
+        self.performance_mode = True
 
         start_latitude = 51.2070
         start_longitude = 16.1553
@@ -982,13 +917,16 @@ class RouteApp:
         elapsed_time = end_time - start_time
 
         self.points = best_route
+        self.route_optimized = False
+        self.performance_mode = True
+
         self.refresh_points_list()
         self.draw_points()
         self.update_distance_label()
         self.improvement_label.config(text="Poprawa: test wydajności")
 
         self.status_label.config(
-            text=f"Status: 100 punktów zoptymalizowano w {elapsed_time:.2f} s"
+            text=f"Status: test 100 pkt: {elapsed_time:.2f} s"
         )
 
     def generate_performance_report(self):
@@ -1067,6 +1005,64 @@ class RouteApp:
             file.write(report_content)
 
         self.status_label.config(text="Status: wygenerowano raport wydajności")
+
+    def create_map_legend(self, parent):
+        legend_frame = tk.Frame(
+            parent,
+            bg="white",
+            bd=1,
+            relief="solid"
+        )
+        legend_frame.place(x=35, rely=1.0, y=-35, anchor="sw")
+
+        title = tk.Label(
+            legend_frame,
+            text="Legenda mapy",
+            bg="white",
+            fg="#111827",
+            font=("Arial", 10, "bold")
+        )
+        title.pack(anchor="w", padx=10, pady=(8, 4))
+
+        items = [
+            ("●", "#16a34a", "magazyn / punkt startowy"),
+            ("●", "#f59e0b", "punkt do odwiedzenia"),
+            ("●", "#9ca3af", "punkt dostarczony"),
+            ("✓", "#16a34a", "dostarczono"),
+            ("—", "#2563eb", "trasa przejazdu")
+        ]
+
+        for symbol, color, text in items:
+            row = tk.Frame(legend_frame, bg="white")
+            row.pack(anchor="w", padx=10, pady=1)
+
+            icon = tk.Label(
+                row,
+                text=symbol,
+                bg="white",
+                fg=color,
+                font=("Arial", 10, "bold"),
+                width=2
+            )
+            icon.pack(side="left")
+
+            label = tk.Label(
+                row,
+                text=text,
+                bg="white",
+                fg="#374151",
+                font=("Arial", 9)
+            )
+            label.pack(side="left")
+
+        info = tk.Label(
+            legend_frame,
+            text="Trasa jest rysowana na mapie OSM.",
+            bg="white",
+            fg="#6b7280",
+            font=("Arial", 8)
+        )
+        info.pack(anchor="w", padx=10, pady=(4, 8))
 
 
 def run_app():

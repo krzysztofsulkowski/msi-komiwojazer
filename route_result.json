@@ -1,68 +1,82 @@
 {
-    "distance": 2778.8037760232905,
+    "distance": 1424.8273078159532,
     "route": [
         {
             "name": "Baza",
-            "latitude": 51.1079,
-            "longitude": 17.0385,
-            "x": 425.3899999999999,
-            "y": 554.6242499999998,
+            "address": "Magazyn Legnica, ul. Nowodworska 30",
+            "comment": "",
+            "latitude": 51.1876,
+            "longitude": 16.1752,
+            "x": 651.9999999999989,
+            "y": 508.7999999999516,
             "is_start": true,
             "delivered": false
         },
         {
             "name": "Punkt 3",
-            "latitude": 50.0647,
-            "longitude": 19.945,
-            "x": 832.3000000000001,
-            "y": 703.2802499999997,
+            "address": "Legnica, ul. Wrocławska 88",
+            "comment": "",
+            "latitude": 51.2087,
+            "longitude": 16.1815,
+            "x": 714.9999999999932,
+            "y": 255.59999999997305,
             "is_start": false,
-            "delivered": true
+            "delivered": false
         },
         {
-            "name": "Punkt 6",
-            "latitude": 51.2465,
-            "longitude": 22.5684,
-            "x": 1199.576,
-            "y": 534.8737500000003,
-            "is_start": false,
-            "delivered": true
-        },
-        {
-            "name": "Punkt 2",
-            "latitude": 52.2297,
-            "longitude": 21.0122,
-            "x": 981.708,
-            "y": 394.76774999999986,
+            "name": "Punkt 4",
+            "address": "Legnica, ul. Gwiezdna 4",
+            "comment": "",
+            "latitude": 51.2172,
+            "longitude": 16.1847,
+            "x": 746.9999999999892,
+            "y": 153.5999999999918,
             "is_start": false,
             "delivered": false
         },
         {
             "name": "Punkt 1",
-            "latitude": 51.7592,
-            "longitude": 19.456,
-            "x": 763.8399999999999,
-            "y": 461.814,
+            "address": "Legnica, Rynek 24",
+            "comment": "",
+            "latitude": 51.2074,
+            "longitude": 16.1619,
+            "x": 518.999999999991,
+            "y": 271.1999999999802,
             "is_start": false,
-            "delivered": true
+            "delivered": false
+        },
+        {
+            "name": "Punkt 6",
+            "address": "Legnica, ul. Chojnowska 76",
+            "comment": "",
+            "latitude": 51.2131,
+            "longitude": 16.1342,
+            "x": 242.000000000001,
+            "y": 202.80000000000783,
+            "is_start": false,
+            "delivered": false
+        },
+        {
+            "name": "Punkt 2",
+            "address": "Legnica, ul. Złotoryjska 65",
+            "comment": "",
+            "latitude": 51.2054,
+            "longitude": 16.1489,
+            "x": 389.00000000001154,
+            "y": 295.2000000000109,
+            "is_start": false,
+            "delivered": false
         },
         {
             "name": "Punkt 5",
-            "latitude": 54.352,
-            "longitude": 18.6466,
-            "x": 650.5239999999999,
-            "y": 92.34000000000046,
+            "address": "Legnica, ul. Jaworzyńska 43",
+            "comment": "",
+            "latitude": 51.1989,
+            "longitude": 16.1554,
+            "x": 454.0000000000013,
+            "y": 373.19999999996145,
             "is_start": false,
-            "delivered": true
-        },
-        {
-            "name": "Punkt 4",
-            "latitude": 53.4285,
-            "longitude": 14.5528,
-            "x": 77.39199999999992,
-            "y": 223.93875000000006,
-            "is_start": false,
-            "delivered": true
+            "delivered": false
         }
     ]
 }

@@ -1,14 +1,14 @@
 RAPORT WYDAJNOŚCI
-Data wygenerowania: 2026-04-28 09:44:46
+Data wygenerowania: 2026-05-04 14:29:10
 
 10 punktów:
-czas: 0.82 s
-dystans: 3367.51
+czas: 0.94 s
+dystans: 2451.63
 limit: 60 s
 status: SPEŁNIONO
 
 100 punktów:
-czas: 4.49 s
-dystans: 42326.77
+czas: 4.58 s
+dystans: 33678.69
 limit: 10 s
 status: SPEŁNIONO
