@@ -6,39 +6,62 @@ def calculate_distance(point_a, point_b):
     return np.sqrt((point_a.x - point_b.x) ** 2 + (point_a.y - point_b.y) ** 2)
 
 
+def build_distance_matrix(points):
+    size = len(points)
+    matrix = np.zeros((size, size))
+
+    for i in range(size):
+        for j in range(i + 1, size):
+            distance = calculate_distance(points[i], points[j])
+            matrix[i][j] = distance
+            matrix[j][i] = distance
+
+    return matrix
+
+
 def calculate_total_distance(points, return_to_start=True):
     if len(points) < 2:
         return 0
 
+    matrix = build_distance_matrix(points)
+    route = list(range(len(points)))
+
+    return calculate_route_distance(route, matrix, return_to_start)
+
+
+def calculate_route_distance(route, distance_matrix, return_to_start=True):
+    if len(route) < 2:
+        return 0
+
     total = 0
 
-    for i in range(len(points) - 1):
-        total += calculate_distance(points[i], points[i + 1])
+    for i in range(len(route) - 1):
+        total += distance_matrix[route[i]][route[i + 1]]
 
     if return_to_start:
-        total += calculate_distance(points[-1], points[0])
+        total += distance_matrix[route[-1]][route[0]]
 
     return total
 
 
-def create_random_route(points):
-    if len(points) <= 2:
-        return points[:]
+def create_random_route_indices(points_count):
+    if points_count <= 2:
+        return list(range(points_count))
 
-    start = points[0]
-    rest = points[1:]
-    shuffled = rest[:]
-    random.shuffle(shuffled)
-    return [start] + shuffled
+    start = 0
+    rest = list(range(1, points_count))
+    random.shuffle(rest)
 
-
-def create_initial_population(points, population_size):
-    return [create_random_route(points) for _ in range(population_size)]
+    return [start] + rest
 
 
-def tournament_selection(population, tournament_size=3):
+def create_initial_population(points_count, population_size):
+    return [create_random_route_indices(points_count) for _ in range(population_size)]
+
+
+def tournament_selection(population, distance_matrix, tournament_size=3):
     participants = random.sample(population, min(tournament_size, len(population)))
-    participants.sort(key=calculate_total_distance)
+    participants.sort(key=lambda route: calculate_route_distance(route, distance_matrix))
     return participants[0][:]
 
 
@@ -58,6 +81,7 @@ def crossover(parent1, parent2):
     child_rest = [point for point in p2 if point not in child_middle]
 
     child = child_rest[:start_idx] + child_middle + child_rest[start_idx:]
+
     return [start_point] + child
 
 
@@ -79,19 +103,27 @@ def genetic_algorithm_route(points, population_size=100, generations=200, mutati
     if len(points) <= 2:
         return points[:], calculate_total_distance(points)
 
-    population = create_initial_population(points, population_size)
-    best_route = min(population, key=calculate_total_distance)
-    best_distance = calculate_total_distance(best_route)
+    distance_matrix = build_distance_matrix(points)
+    population = create_initial_population(len(points), population_size)
+
+    best_route_indices = min(
+        population,
+        key=lambda route: calculate_route_distance(route, distance_matrix)
+    )
+    best_distance = calculate_route_distance(best_route_indices, distance_matrix)
 
     for _ in range(generations):
         new_population = []
 
-        elite = min(population, key=calculate_total_distance)
+        elite = min(
+            population,
+            key=lambda route: calculate_route_distance(route, distance_matrix)
+        )
         new_population.append(elite[:])
 
         while len(new_population) < population_size:
-            parent1 = tournament_selection(population)
-            parent2 = tournament_selection(population)
+            parent1 = tournament_selection(population, distance_matrix)
+            parent2 = tournament_selection(population, distance_matrix)
 
             child = crossover(parent1, parent2)
             child = mutate(child, mutation_rate)
@@ -100,11 +132,16 @@ def genetic_algorithm_route(points, population_size=100, generations=200, mutati
 
         population = new_population
 
-        current_best = min(population, key=calculate_total_distance)
-        current_distance = calculate_total_distance(current_best)
+        current_best = min(
+            population,
+            key=lambda route: calculate_route_distance(route, distance_matrix)
+        )
+        current_distance = calculate_route_distance(current_best, distance_matrix)
 
         if current_distance < best_distance:
-            best_route = current_best[:]
+            best_route_indices = current_best[:]
             best_distance = current_distance
+
+    best_route = [points[index] for index in best_route_indices]
 
     return best_route, best_distance

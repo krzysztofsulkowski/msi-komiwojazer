@@ -13,7 +13,7 @@ from app.route_service import get_road_route_between_points
 class RouteApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("MSI - Problem Komiwojażera")
+        self.root.title("Komiwojażer")
         self.root.geometry("1280x720")
         self.root.configure(bg="#f3f4f6")
 
@@ -998,6 +998,9 @@ class RouteApp:
         report_content = (
                 "RAPORT WYDAJNOŚCI\n"
                 f"Data wygenerowania: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                "Zakres testu:\n"
+                "Raport mierzy czas działania algorytmu optymalizacji trasy.\n"
+                "Test nie uwzględnia czasu geokodowania adresów, pobierania trasy z OSRM ani rysowania mapy.\n\n"
                 + "\n".join(results)
         )
 
@@ -1057,7 +1060,6 @@ class RouteApp:
 
         info = tk.Label(
             legend_frame,
-            text="Trasa jest rysowana na mapie OSM.",
             bg="white",
             fg="#6b7280",
             font=("Arial", 8)
