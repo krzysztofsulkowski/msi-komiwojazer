@@ -2,3 +2,4 @@ numpy
 geopy
 tkintermapview
 requests
+Pillow

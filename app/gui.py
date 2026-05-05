@@ -1,13 +1,15 @@
 import tkinter as tk
+from tkinter import filedialog
 import tkintermapview
 import random
 import time
 from datetime import datetime
 from app.models import Point
 from app.optimizer import genetic_algorithm_route, calculate_total_distance
-from app.exporter import export_route_to_json
+from app.exporter import export_route_to_json, import_route_from_json
 from app.geocoder import search_address
 from app.route_service import get_road_route_between_points
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 
 class RouteApp:
@@ -26,10 +28,13 @@ class RouteApp:
         self.improvement_label = None
         self.status_label = None
         self.details_label = None
+        self.route_info_frame = None
 
         self.map_widget = None
         self.map_markers = []
+        self.marker_icons = []
         self.map_path = None
+        self.map_paths = []
         self.route_optimized = False
         self.performance_mode = False
 
@@ -73,6 +78,7 @@ class RouteApp:
         self.map_widget.set_zoom(13)
 
         self.create_map_legend(left_panel)
+        self.create_route_info_panel(left_panel)
 
         right_container = tk.Frame(content, bg="white", width=350, height=560)
         right_container.pack(side="right", fill="y", padx=(20, 0))
@@ -113,9 +119,19 @@ class RouteApp:
         def on_mousewheel(event):
             right_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
+        def bind_mousewheel(event):
+            right_canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        def unbind_mousewheel(event):
+            right_canvas.unbind_all("<MouseWheel>")
+
         right_panel.bind("<Configure>", update_scroll_region)
         right_canvas.bind("<Configure>", resize_right_panel)
-        right_canvas.bind_all("<MouseWheel>", on_mousewheel)
+
+        right_canvas.bind("<Enter>", bind_mousewheel)
+        right_canvas.bind("<Leave>", unbind_mousewheel)
+        right_panel.bind("<Enter>", bind_mousewheel)
+        right_panel.bind("<Leave>", unbind_mousewheel)
 
         points_title = tk.Label(
             right_panel,
@@ -139,7 +155,7 @@ class RouteApp:
             pady=8,
             command=self.load_sample_points
         )
-        sample_button.pack(anchor="w", padx=20, pady=(0, 8))
+        sample_button.pack(fill="x", padx=20, pady=(0, 8))
 
         clear_button = tk.Button(
             right_panel,
@@ -152,7 +168,7 @@ class RouteApp:
             pady=8,
             command=self.clear_route
         )
-        clear_button.pack(anchor="w", padx=20, pady=(0, 20))
+        clear_button.pack(fill="x", padx=20, pady=(0, 20))
 
         self.create_section_title(right_panel, "Dodawanie punktu")
 
@@ -193,7 +209,7 @@ class RouteApp:
 
         latitude_label = tk.Label(
             form_frame,
-            text="Latitude:",
+            text="Szerokość geograficzna:",
             bg="white",
             fg="#111827",
             font=("Arial", 11)
@@ -209,7 +225,7 @@ class RouteApp:
 
         longitude_label = tk.Label(
             form_frame,
-            text="Longitude:",
+            text="Długość geograficzna:",
             bg="white",
             fg="#111827",
             font=("Arial", 11)
@@ -234,7 +250,7 @@ class RouteApp:
             pady=8,
             command=self.search_address_from_form
         )
-        search_address_button.pack(anchor="w", padx=20, pady=(0, 8))
+        search_address_button.pack(fill="x", padx=20, pady=(0, 8))
 
         self.address_results_list = tk.Listbox(
             right_panel,
@@ -247,6 +263,19 @@ class RouteApp:
         self.address_results_list.pack(fill="x", padx=20, pady=(0, 8))
         self.address_results_list.bind("<<ListboxSelect>>", self.select_address_result)
 
+        set_depot_button = tk.Button(
+            right_panel,
+            text="Ustaw magazyn",
+            bg="#16a34a",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            relief="flat",
+            padx=12,
+            pady=8,
+            command=self.set_depot
+        )
+        set_depot_button.pack(fill="x", padx=20, pady=(0, 8))
+
         add_button = tk.Button(
             right_panel,
             text="Dodaj punkt",
@@ -258,7 +287,20 @@ class RouteApp:
             pady=8,
             command=self.add_point
         )
-        add_button.pack(anchor="w", padx=20, pady=(0, 8))
+        add_button.pack(fill="x", padx=20, pady=(0, 8))
+
+        delete_button = tk.Button(
+            right_panel,
+            text="Usuń punkt",
+            bg="#dc2626",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            relief="flat",
+            padx=12,
+            pady=8,
+            command=self.delete_selected_point
+        )
+        delete_button.pack(fill="x", padx=20, pady=(0, 8))
 
         self.create_section_title(right_panel, "Zarządzanie punktem")
 
@@ -273,18 +315,38 @@ class RouteApp:
             pady=8,
             command=self.save_comment_to_selected_point
         )
-        comment_button.pack(anchor="w", padx=20, pady=(0, 20))
+        comment_button.pack(fill="x", padx=20, pady=(0, 20))
+
+        points_list_frame = tk.Frame(right_panel, bg="white")
+        points_list_frame.pack(fill="x", padx=20, pady=(0, 20))
 
         self.points_list = tk.Listbox(
-            right_panel,
+            points_list_frame,
             font=("Arial", 12),
             bd=0,
-            highlightthickness=0,
-            height=7
+            highlightthickness=1,
+            highlightbackground="#d1d5db",
+            height=7,
+            yscrollcommand=None
         )
-        self.points_list.pack(fill="x", expand=False, padx=20, pady=(0, 20))
+        self.points_list.pack(side="left", fill="both", expand=True)
+
+        points_list_scrollbar = tk.Scrollbar(
+            points_list_frame,
+            orient="vertical",
+            command=self.points_list.yview
+        )
+        points_list_scrollbar.pack(side="right", fill="y")
+
+        self.points_list.config(yscrollcommand=points_list_scrollbar.set)
 
         self.points_list.bind("<<ListboxSelect>>", self.show_selected_point_details)
+
+        def on_points_list_mousewheel(event):
+            self.points_list.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            return "break"
+
+        self.points_list.bind("<MouseWheel>", on_points_list_mousewheel)
 
         self.details_label = tk.Label(
             right_panel,
@@ -300,7 +362,7 @@ class RouteApp:
 
         delivered_button = tk.Button(
             right_panel,
-            text="Oznacz jako dostarczone",
+            text="Oznacz jako dostarczone/niedostarczone",
             bg="#16a34a",
             fg="white",
             font=("Arial", 11, "bold"),
@@ -339,22 +401,22 @@ class RouteApp:
         )
         export_button.pack(fill="x", padx=20, pady=(0, 8))
 
-        performance_button = tk.Button(
+        import_button = tk.Button(
             right_panel,
-            text="Test wydajności 100 punktów",
-            bg="#0f766e",
+            text="Importuj trasę z JSON",
+            bg="#4f46e5",
             fg="white",
             font=("Arial", 11, "bold"),
             relief="flat",
             padx=12,
             pady=8,
-            command=self.run_performance_test
+            command=self.import_route
         )
-        performance_button.pack(fill="x", padx=20, pady=(0, 20))
+        import_button.pack(fill="x", padx=20, pady=(0, 8))
 
         report_button = tk.Button(
             right_panel,
-            text="Raport wydajności",
+            text="Generuj raport wydajności",
             bg="#7c2d12",
             fg="white",
             font=("Arial", 11, "bold"),
@@ -364,33 +426,6 @@ class RouteApp:
             command=self.generate_performance_report
         )
         report_button.pack(fill="x", padx=20, pady=(0, 20))
-
-        self.distance_label = tk.Label(
-            right_panel,
-            text="Dystans trasy: 0.00",
-            bg="white",
-            fg="#111827",
-            font=("Arial", 12)
-        )
-        self.distance_label.pack(anchor="w", padx=20, pady=(0, 10))
-
-        self.improvement_label = tk.Label(
-            right_panel,
-            text="Poprawa: 0.00",
-            bg="white",
-            fg="#15803d",
-            font=("Arial", 12)
-        )
-        self.improvement_label.pack(anchor="w", padx=20, pady=(0, 10))
-
-        self.status_label = tk.Label(
-            right_panel,
-            text="Status: oczekiwanie",
-            bg="white",
-            fg="#6b7280",
-            font=("Arial", 11)
-        )
-        self.status_label.pack(anchor="w", padx=20, pady=(0, 20))
 
     def create_section_title(self, parent, text):
         label = tk.Label(
@@ -465,104 +500,146 @@ class RouteApp:
 
         self.status_label.config(text="Status: wybrano adres i uzupełniono współrzędne")
 
-    def add_point(self):
+    def get_point_data_from_form(self):
         try:
             latitude = float(self.latitude_entry.get())
             longitude = float(self.longitude_entry.get())
         except ValueError:
-            self.status_label.config(text="Status: wpisz poprawne latitude i longitude")
-            return
+            self.status_label.config(text="Status: wpisz poprawne współrzędne")
+            return None
 
         if latitude < 51.18 or latitude > 51.23 or longitude < 16.11 or longitude > 16.21:
             self.status_label.config(text="Status: wpisz współrzędne z obszaru Legnicy")
-            return
+            return None
 
         address = self.address_entry.get().strip()
         comment = self.comment_entry.get().strip()
 
-        if not address:
-            address = "Baza" if self.point_counter == 0 else f"Punkt {self.point_counter}"
+        return address, comment, latitude, longitude
 
-        x, y = self.convert_gps_to_canvas_position(latitude, longitude)
-
-        if self.point_counter == 0:
-            point = Point(
-                name="Baza",
-                latitude=latitude,
-                longitude=longitude,
-                x=x,
-                y=y,
-                address=address,
-                comment=comment,
-                is_start=True
-            )
-        else:
-            point = Point(
-                name=f"Punkt {self.point_counter}",
-                latitude=latitude,
-                longitude=longitude,
-                x=x,
-                y=y,
-                address=address,
-                comment=comment,
-                is_start=False
-            )
-
-        self.points.append(point)
-        self.point_counter += 1
-
+    def clear_point_form(self):
         self.address_entry.delete(0, tk.END)
         self.comment_entry.delete(0, tk.END)
         self.latitude_entry.delete(0, tk.END)
         self.longitude_entry.delete(0, tk.END)
 
+    def set_depot(self):
+        data = self.get_point_data_from_form()
+
+        if data is None:
+            return
+
+        address, comment, latitude, longitude = data
+
+        if not address:
+            address = "Magazyn"
+
+        x, y = self.convert_gps_to_canvas_position(latitude, longitude)
+
+        depot = Point(
+            name="Baza",
+            latitude=latitude,
+            longitude=longitude,
+            x=x,
+            y=y,
+            address=address,
+            comment=comment,
+            is_start=True
+        )
+
+        if self.points and self.points[0].is_start:
+            self.points[0] = depot
+        else:
+            self.points.insert(0, depot)
+
         self.route_optimized = False
         self.performance_mode = False
+
+        self.clear_point_form()
         self.refresh_points_list()
         self.draw_points()
         self.update_distance_label()
-        self.improvement_label.config(text="Poprawa: 0.00")
-        self.status_label.config(text="Status: dodano punkt")
+        self.improvement_label.config(text="Poprawa: brak")
+        self.status_label.config(text="Status: ustawiono magazyn")
+
+    def add_point(self):
+        if not self.points or not self.points[0].is_start:
+            self.status_label.config(text="Status: najpierw ustaw magazyn")
+            return
+
+        data = self.get_point_data_from_form()
+
+        if data is None:
+            return
+
+        address, comment, latitude, longitude = data
+
+        if not address:
+            address = f"Punkt {self.point_counter + 1}"
+
+        x, y = self.convert_gps_to_canvas_position(latitude, longitude)
+
+        point = Point(
+            name=f"Punkt {self.point_counter + 1}",
+            latitude=latitude,
+            longitude=longitude,
+            x=x,
+            y=y,
+            address=address,
+            comment=comment,
+            is_start=False
+        )
+
+        self.points.append(point)
+        self.point_counter += 1
+
+        self.route_optimized = False
+        self.performance_mode = False
+
+        self.clear_point_form()
+        self.refresh_points_list()
+        self.draw_points()
+        self.update_distance_label()
+        self.improvement_label.config(text="Poprawa: brak")
+        self.status_label.config(text="Status: dodano punkt trasy")
 
     def load_sample_points(self):
         self.points = []
         self.point_counter = 0
 
-        sample_positions = [
-            ("Magazyn Legnica, ul. Nowodworska 30", "", 51.1876, 16.1752),
-            ("Legnica, Rynek 24", "", 51.2074, 16.1619),
-            ("Legnica, ul. Złotoryjska 65", "", 51.2054, 16.1489),
-            ("Legnica, ul. Wrocławska 88", "", 51.2087, 16.1815),
-            ("Legnica, ul. Gwiezdna 4", "", 51.2172, 16.1847),
-            ("Legnica, ul. Jaworzyńska 43", "", 51.1989, 16.1554),
-            ("Legnica, ul. Chojnowska 76", "", 51.2131, 16.1342)
-        ]
+        start_latitude = 51.2070
+        start_longitude = 16.1553
+        x, y = self.convert_gps_to_canvas_position(start_latitude, start_longitude)
 
-        for address, comment, latitude, longitude in sample_positions:
+        start_point = Point(
+            name="Baza",
+            latitude=start_latitude,
+            longitude=start_longitude,
+            x=x,
+            y=y,
+            address="Magazyn Legnica",
+            comment="",
+            is_start=True
+        )
+
+        self.points.append(start_point)
+        self.point_counter += 1
+
+        for i in range(1, 11):
+            latitude = random.uniform(51.18, 51.23)
+            longitude = random.uniform(16.11, 16.21)
             x, y = self.convert_gps_to_canvas_position(latitude, longitude)
 
-            if self.point_counter == 0:
-                point = Point(
-                    name="Baza",
-                    latitude=latitude,
-                    longitude=longitude,
-                    x=x,
-                    y=y,
-                    address=address,
-                    comment=comment,
-                    is_start=True
-                )
-            else:
-                point = Point(
-                    name=f"Punkt {self.point_counter}",
-                    latitude=latitude,
-                    longitude=longitude,
-                    x=x,
-                    y=y,
-                    address=address,
-                    comment=comment,
-                    is_start=False
-                )
+            point = Point(
+                name=f"Punkt {i}",
+                latitude=latitude,
+                longitude=longitude,
+                x=x,
+                y=y,
+                address=f"Testowy punkt {i}",
+                comment="",
+                is_start=False
+            )
 
             self.points.append(point)
             self.point_counter += 1
@@ -572,8 +649,8 @@ class RouteApp:
         self.refresh_points_list()
         self.draw_points()
         self.update_distance_label()
-        self.improvement_label.config(text="Poprawa: 0.00")
-        self.status_label.config(text="Status: wczytano przykładowe punkty")
+        self.improvement_label.config(text="Poprawa: brak")
+        self.status_label.config(text="Status: wczytano 10 punktów + magazyn")
 
     def clear_route(self):
         self.points = []
@@ -587,17 +664,12 @@ class RouteApp:
 
         self.map_markers = []
 
-        if self.map_path:
-            self.map_path.delete()
-            self.map_path = None
+        self.clear_map_paths()
 
-        self.address_entry.delete(0, tk.END)
-        self.comment_entry.delete(0, tk.END)
-        self.latitude_entry.delete(0, tk.END)
-        self.longitude_entry.delete(0, tk.END)
+        self.clear_point_form()
 
         self.distance_label.config(text="Dystans trasy: 0.00")
-        self.improvement_label.config(text="Poprawa: 0.00")
+        self.improvement_label.config(text="Poprawa: brak")
         self.status_label.config(text="Status: wyczyszczono trasę")
 
     def refresh_points_list(self):
@@ -662,7 +734,7 @@ class RouteApp:
         selected_text = self.points_list.get(selected_index[0])
 
         if selected_text.startswith("Start"):
-            self.status_label.config(text="Status: baza nie jest punktem dostawy")
+            self.status_label.config(text="Status: magazyn nie jest punktem dostawy")
             return
 
         delivery_points = [point for point in self.points if not point.is_start]
@@ -673,12 +745,51 @@ class RouteApp:
             self.status_label.config(text="Status: nieprawidłowy punkt")
             return
 
-        delivery_points[point_index].delivered = True
+        selected_point = delivery_points[point_index]
+        selected_point.delivered = not selected_point.delivered
 
         self.refresh_points_list()
         self.draw_points()
         self.show_selected_point_details()
-        self.status_label.config(text="Status: oznaczono paczkę jako dostarczoną")
+
+        if selected_point.delivered:
+            self.status_label.config(text="Status: oznaczono paczkę jako dostarczoną")
+        else:
+            self.status_label.config(text="Status: cofnięto status dostarczenia")
+
+    def delete_selected_point(self):
+        selected_index = self.points_list.curselection()
+
+        if not selected_index:
+            self.status_label.config(text="Status: wybierz punkt z listy")
+            return
+
+        index = selected_index[0]
+
+        if index == 0:
+            self.status_label.config(text="Status: nie można usunąć magazynu")
+            return
+
+        delivery_points = [point for point in self.points if not point.is_start]
+        point_index = index - 1
+
+        if point_index < 0 or point_index >= len(delivery_points):
+            self.status_label.config(text="Status: nieprawidłowy punkt")
+            return
+
+        point_to_delete = delivery_points[point_index]
+        self.points.remove(point_to_delete)
+
+        self.point_counter = len([point for point in self.points if not point.is_start])
+        self.route_optimized = False
+        self.performance_mode = False
+
+        self.refresh_points_list()
+        self.draw_points()
+        self.update_distance_label()
+        self.improvement_label.config(text="Poprawa: brak")
+        self.details_label.config(text="Szczegóły punktu: brak wybranego punktu")
+        self.status_label.config(text="Status: usunięto punkt")
 
     def save_comment_to_selected_point(self):
         selected_index = self.points_list.curselection()
@@ -713,15 +824,56 @@ class RouteApp:
         self.show_selected_point_details()
         self.status_label.config(text="Status: zapisano komentarz do punktu")
 
+    def clear_map_paths(self):
+        if self.map_path:
+            self.map_path.delete()
+            self.map_path = None
+
+        for path in self.map_paths:
+            path.delete()
+
+        self.map_paths = []
+
+    def create_marker_icon(self, label, color, delivered=False):
+        image = Image.new("RGBA", (44, 62), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+
+        draw.ellipse((7, 3, 37, 33), fill=color, outline="#111827", width=2)
+        draw.polygon([(17, 30), (27, 30), (22, 55)], fill=color)
+        draw.line([(17, 30), (22, 55), (27, 30)], fill="#111827", width=2)
+
+        try:
+            font = ImageFont.truetype("arial.ttf", 14)
+        except OSError:
+            font = ImageFont.load_default()
+
+        text_box = draw.textbbox((0, 0), label, font=font)
+        text_width = text_box[2] - text_box[0]
+        text_height = text_box[3] - text_box[1]
+
+        draw.text(
+            (22 - text_width / 2, 18 - text_height / 2),
+            label,
+            fill="white",
+            font=font
+        )
+
+        if delivered:
+            draw.ellipse((28, 0, 43, 15), fill="#16a34a", outline="white", width=1)
+            draw.line([(31, 8), (35, 12), (41, 3)], fill="white", width=2)
+
+        icon = ImageTk.PhotoImage(image)
+        self.marker_icons.append(icon)
+
+        return icon
+
     def draw_points(self):
         for marker in self.map_markers:
             marker.delete()
 
         self.map_markers = []
-
-        if self.map_path:
-            self.map_path.delete()
-            self.map_path = None
+        self.marker_icons = []
+        self.clear_map_paths()
 
         if not self.points:
             return
@@ -736,49 +888,158 @@ class RouteApp:
                 (self.points[0].latitude, self.points[0].longitude)
             )
 
-            self.map_path = self.map_widget.set_path(
+            path = self.map_widget.set_path(
                 straight_route,
                 color="#2563eb",
                 width=3
             )
 
+            self.map_paths.append(path)
+
+
         elif len(self.points) > 1 and self.route_optimized and not self.performance_mode:
-            road_route_coordinates = []
+
             total_road_distance = 0
 
             full_route = self.points + [self.points[0]]
 
+            segment_colors = [
+
+                "#ff0054",
+
+                "#00b4d8",
+
+                "#ffbe0b",
+
+                "#8338ec",
+
+                "#fb5607",
+
+                "#3a86ff",
+
+                "#ff006e",
+
+                "#7209b7",
+
+                "#06d6a0",
+
+                "#f72585",
+
+                "#4cc9f0",
+
+                "#b5179e",
+
+                "#ff9f1c",
+
+                "#4361ee",
+
+                "#2ec4b6"
+
+            ]
+
+            segments = []
+
             for i in range(len(full_route) - 1):
+
+                start_point = full_route[i]
+
+                end_point = full_route[i + 1]
+
                 distance_km, route_coordinates = get_road_route_between_points(
-                    full_route[i],
-                    full_route[i + 1]
+
+                    start_point,
+
+                    end_point
+
                 )
 
                 if route_coordinates:
-                    if road_route_coordinates:
-                        road_route_coordinates.extend(route_coordinates[1:])
-                    else:
-                        road_route_coordinates.extend(route_coordinates)
+
+                    segment_coordinates = route_coordinates
 
                     total_road_distance += distance_km
+
                 else:
-                    fallback_coordinates = [
-                        (full_route[i].latitude, full_route[i].longitude),
-                        (full_route[i + 1].latitude, full_route[i + 1].longitude)
+
+                    segment_coordinates = [
+
+                        (start_point.latitude, start_point.longitude),
+
+                        (end_point.latitude, end_point.longitude)
+
                     ]
 
-                    if road_route_coordinates:
-                        road_route_coordinates.extend(fallback_coordinates[1:])
-                    else:
-                        road_route_coordinates.extend(fallback_coordinates)
+                is_delivered_segment = not end_point.is_start and end_point.delivered
 
-            self.map_path = self.map_widget.set_path(
-                road_route_coordinates,
-                color="#dc2626",
-                width=4
-            )
+                segments.append(
 
-            self.distance_label.config(text=f"Dystans trasy: {total_road_distance:.2f} km")
+                    {
+
+                        "coordinates": segment_coordinates,
+
+                        "color": segment_colors[i % len(segment_colors)],
+
+                        "delivered": is_delivered_segment
+
+                    }
+
+                )
+
+            for segment in segments:
+
+                if segment["delivered"]:
+                    outline_path = self.map_widget.set_path(
+
+                        segment["coordinates"],
+
+                        color="#111827",
+
+                        width=7
+
+                    )
+
+                    self.map_paths.append(outline_path)
+
+                    path = self.map_widget.set_path(
+
+                        segment["coordinates"],
+
+                        color="#9ca3af",
+
+                        width=5
+
+                    )
+
+                    self.map_paths.append(path)
+
+            for segment in reversed(segments):
+
+                if not segment["delivered"]:
+                    outline_path = self.map_widget.set_path(
+
+                        segment["coordinates"],
+
+                        color="#111827",
+
+                        width=7
+
+                    )
+
+                    self.map_paths.append(outline_path)
+
+                    path = self.map_widget.set_path(
+
+                        segment["coordinates"],
+
+                        color=segment["color"],
+
+                        width=5
+
+                    )
+
+                    self.map_paths.append(path)
+
+            self.distance_label.config(text=f"Dystans: {total_road_distance:.2f} km")
 
         delivery_number = 1
 
@@ -795,12 +1056,17 @@ class RouteApp:
 
                 delivery_number += 1
 
+            icon = self.create_marker_icon(
+                marker_text.replace(" ✓", ""),
+                marker_color,
+                point.delivered and not point.is_start
+            )
+
             marker = self.map_widget.set_marker(
                 point.latitude,
                 point.longitude,
-                text=marker_text,
-                marker_color_circle=marker_color,
-                marker_color_outside=marker_color
+                icon=icon,
+                icon_anchor="s"
             )
 
             self.map_markers.append(marker)
@@ -829,7 +1095,11 @@ class RouteApp:
 
     def update_distance_label(self):
         distance = calculate_total_distance(self.points)
-        self.distance_label.config(text=f"Dystans trasy: {distance:.2f}")
+
+        if self.route_optimized:
+            self.distance_label.config(text=f"Dystans: {distance:.2f}")
+        else:
+            self.distance_label.config(text=f"Dystans: {distance:.2f}")
 
     def optimize_route(self):
         self.performance_mode = False
@@ -846,13 +1116,14 @@ class RouteApp:
         self.route_optimized = True
         self.refresh_points_list()
         self.draw_points()
-        self.update_distance_label()
 
-        improvement = before_distance - best_distance
-        self.improvement_label.config(text=f"Poprawa: {improvement:.2f}")
-        self.status_label.config(
-            text=f"Status: zoptymalizowano trasę (poprawa {improvement:.2f})"
-        )
+        if before_distance > 0:
+            improvement_percent = ((before_distance - best_distance) / before_distance) * 100
+        else:
+            improvement_percent = 0
+
+        self.improvement_label.config(text=f"Poprawa: {improvement_percent:.1f}%")
+        self.status_label.config(text="Status: trasa zoptymalizowana")
 
     def export_route(self):
         if len(self.points) < 2:
@@ -861,6 +1132,42 @@ class RouteApp:
 
         export_route_to_json(self.points, "route_result.json")
         self.status_label.config(text="Status: wyeksportowano trasę do JSON")
+
+    def import_route(self):
+        file_path = filedialog.askopenfilename(
+            filetypes=[("JSON files", "*.json")]
+        )
+
+        if not file_path:
+            return
+
+        try:
+            imported_points = import_route_from_json(file_path)
+        except Exception:
+            self.status_label.config(text="Status: błąd importu JSON")
+            return
+
+        if not imported_points:
+            self.status_label.config(text="Status: plik JSON nie zawiera trasy")
+            return
+
+        self.points = imported_points
+        self.point_counter = len([point for point in self.points if not point.is_start])
+
+        self.route_optimized = False
+        self.performance_mode = False
+
+        for point in self.points:
+            point.x, point.y = self.convert_gps_to_canvas_position(
+                point.latitude,
+                point.longitude
+            )
+
+        self.refresh_points_list()
+        self.draw_points()
+        self.update_distance_label()
+        self.improvement_label.config(text="Poprawa: brak")
+        self.status_label.config(text="Status: zaimportowano trasę z JSON")
 
     def run_performance_test(self):
         self.points = []
@@ -1058,13 +1365,52 @@ class RouteApp:
             )
             label.pack(side="left")
 
-        info = tk.Label(
-            legend_frame,
+    def create_route_info_panel(self, parent):
+        self.route_info_frame = tk.Frame(
+            parent,
             bg="white",
-            fg="#6b7280",
-            font=("Arial", 8)
+            bd=1,
+            relief="solid"
         )
-        info.pack(anchor="w", padx=10, pady=(4, 8))
+        self.route_info_frame.place(relx=1.0, rely=1.0, x=-35, y=-35, anchor="se")
+
+        title = tk.Label(
+            self.route_info_frame,
+            text="Informacje o trasie",
+            bg="white",
+            fg="#111827",
+            font=("Arial", 10, "bold")
+        )
+        title.pack(anchor="w", padx=10, pady=(8, 4))
+
+        self.distance_label = tk.Label(
+            self.route_info_frame,
+            text="Dystans: 0.00 km",
+            bg="white",
+            fg="#374151",
+            font=("Arial", 9)
+        )
+        self.distance_label.pack(anchor="w", padx=10, pady=1)
+
+        self.improvement_label = tk.Label(
+            self.route_info_frame,
+            text="Poprawa: brak",
+            bg="white",
+            fg="#374151",
+            font=("Arial", 9)
+        )
+        self.improvement_label.pack(anchor="w", padx=10, pady=1)
+
+        self.status_label = tk.Label(
+            self.route_info_frame,
+            text="Status: oczekiwanie",
+            bg="white",
+            fg="#374151",
+            font=("Arial", 9),
+            wraplength=250,
+            justify="left"
+        )
+        self.status_label.pack(anchor="w", padx=10, pady=(1, 8))
 
 
 def run_app():

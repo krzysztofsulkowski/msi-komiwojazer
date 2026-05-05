@@ -1,14 +1,18 @@
 RAPORT WYDAJNOŚCI
-Data wygenerowania: 2026-05-05 09:37:04
+Data wygenerowania: 2026-05-05 12:16:32
+
+Zakres testu:
+Raport mierzy czas działania algorytmu optymalizacji trasy.
+Test nie uwzględnia czasu geokodowania adresów, pobierania trasy z OSRM ani rysowania mapy.
 
 10 punktów:
-czas: 0.52 s
-dystans: 2365.17
+czas: 0.49 s
+dystans: 2565.21
 limit: 60 s
 status: SPEŁNIONO
 
 100 punktów:
-czas: 0.97 s
-dystans: 31581.62
+czas: 1.27 s
+dystans: 33038.35
 limit: 10 s
 status: SPEŁNIONO
